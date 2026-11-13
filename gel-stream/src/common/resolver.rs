@@ -31,7 +31,10 @@ impl Resolver {
     pub fn new() -> Result<Self, std::io::Error> {
         Ok(Self {
             #[cfg(feature = "hickory")]
-            resolver: hickory_resolver::Resolver::builder_tokio()?.build().into(),
+            resolver: hickory_resolver::Resolver::builder_tokio()
+                .and_then(|builder| builder.build())
+                .map_err(std::io::Error::other)?
+                .into(),
         })
     }
 
@@ -56,7 +59,8 @@ impl Resolver {
                         let port = *port;
                         ResolveResult::new_async(async move {
                             let f = resolver.lookup_ip(host);
-                            let Some(addr) = f.await?.iter().next() else {
+                            let Some(addr) = f.await.map_err(std::io::Error::other)?.iter().next()
+                            else {
                                 return Err(std::io::Error::new(
                                     std::io::ErrorKind::NotFound,
                                     "No address found",
